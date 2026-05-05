@@ -1,5 +1,6 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { PlaygroundActionBar } from './components/playground-actionbar'
+import { PlaygroundAdminPanel } from './components/playground-admin-panel'
 import { PlaygroundChat, type ChatMessage } from './components/playground-chat'
 import { PlaygroundCustomizer } from './components/playground-customizer'
 import { PlaygroundDialog } from './components/playground-dialog'
@@ -16,6 +17,7 @@ import { autoNarrateWorld, cancelNarration, isNarrationMuted, setNarrationMuted,
 import { botsFor } from './lib/playground-bots'
 import { itemById, PLAYGROUND_WORLDS, type PlaygroundItemId, type PlaygroundWorldId } from './lib/playground-rpg'
 import type { RemotePlayer } from './hooks/use-playground-multiplayer'
+import { useWorkspaceStore } from '@/stores/workspace-store'
 
 const WORLD_META: Record<PlaygroundWorldId, { name: string; accent: string }> = {
   training: { name: 'Training Grounds', accent: '#5eead4' },
@@ -83,8 +85,14 @@ export function PlaygroundScreen() {
   const focusModeAutoEngagedRef = useRef(false)
   // Narration mute (Web Speech API). Initialized from persisted state.
   const [narrationMuted, setNarrationMutedState] = useState(false)
+  const [adminMode, setAdminMode] = useState(false)
   useEffect(() => {
     setNarrationMutedState(isNarrationMuted())
+  }, [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    setAdminMode(params.get('admin') === '1')
   }, [])
   const heardToastIds = useRef<Set<string>>(new Set())
   const completedTutorialRef = useRef(false)
@@ -222,11 +230,13 @@ export function PlaygroundScreen() {
             delete next[bot.id]
             return next
           })
-        }, 5000)
+        }, 4200)
       }
-      window.setTimeout(tick, 6000 + Math.random() * 8000)
+      // Ambient NPC chatter should make the world feel alive, not drown out
+      // human chat or inflate product energy. Keep it sparse and clearly local.
+      window.setTimeout(tick, 18000 + Math.random() * 20000)
     }
-    const initial = window.setTimeout(tick, 2500)
+    const initial = window.setTimeout(tick, 7000 + Math.random() * 5000)
     return () => {
       cancelled = true
       window.clearTimeout(initial)
@@ -648,6 +658,7 @@ export function PlaygroundScreen() {
           Menu
         </button>
         <PlaygroundHelpHud worldName={WORLD_META[world].name} />
+        {adminMode ? <PlaygroundAdminPanel /> : null}
         <PlaygroundUtilityDock
           audioMuted={audioMuted}
           narrationMuted={narrationMuted}
@@ -1030,13 +1041,15 @@ function ForgeArrivalOverlay({
 
 function NearbyBuildersChip({ players }: { players: RemotePlayer[] }) {
   const [pingedId, setPingedId] = useState<string | null>(null)
+  const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
+  const chromeLeft = sidebarCollapsed ? 'min(120px, 9vw)' : '320px'
 
   if (players.length === 0) return null
 
   return (
     <div
       className="pointer-events-auto fixed top-[210px] z-[70] hidden w-[220px] rounded-2xl border border-white/15 bg-black/65 p-2 text-white shadow-2xl backdrop-blur-xl md:block"
-      style={{ left: 'min(120px, 9vw)' }}
+      style={{ left: chromeLeft }}
     >
       <div className="mb-1 px-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/45">Builders Nearby</div>
       <div className="space-y-1">
